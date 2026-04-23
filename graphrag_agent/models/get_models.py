@@ -5,6 +5,7 @@ from langchain.callbacks.manager import AsyncCallbackManager
 
 import os
 from typing import List
+import numpy as np
 
 from graphrag_agent.config.settings import (
     TIKTOKEN_CACHE_DIR,
@@ -83,14 +84,51 @@ def get_embeddings_model():
                 except TypeError:
                     # older versions may not accept device in encode
                     arr = self.model.encode(texts, batch_size=batch_size, show_progress_bar=False, convert_to_numpy=True)
-                return arr.tolist()
+                # 确保为 numpy 数组
+                if not isinstance(arr, np.ndarray):
+                    arr = np.array(arr, dtype=np.float32)
+
+                # 更新 embedding_size
+                try:
+                    if self.embedding_size is None:
+                        self.embedding_size = int(arr.shape[-1])
+                except Exception:
+                    pass
+
+                # L2 归一化
+                norms = np.linalg.norm(arr, axis=1, keepdims=True)
+                norms[norms == 0] = 1.0
+                arr = arr / norms
+
+                return arr.astype(np.float32).tolist()
 
             def embed_query(self, text: str):
                 try:
                     arr = self.model.encode(text, show_progress_bar=False, convert_to_numpy=True, device=self.device)
                 except TypeError:
                     arr = self.model.encode(text, show_progress_bar=False, convert_to_numpy=True)
-                return arr.tolist()
+                # 确保为 numpy 数组
+                if not isinstance(arr, np.ndarray):
+                    arr = np.array(arr, dtype=np.float32)
+
+                # 如果是二维（单个输入也可能返回二维），降到一维
+                if arr.ndim == 2 and arr.shape[0] == 1:
+                    arr = arr[0]
+
+                # 更新 embedding_size
+                try:
+                    if self.embedding_size is None:
+                        self.embedding_size = int(arr.shape[-1])
+                except Exception:
+                    pass
+
+                # L2 归一化
+                norm = np.linalg.norm(arr)
+                if norm == 0:
+                    norm = 1.0
+                arr = arr / norm
+
+                return arr.astype(np.float32).tolist()
 
         return SentenceTransformerAdapter()
 
