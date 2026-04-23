@@ -3,14 +3,26 @@ from langchain_openai import ChatOpenAI
 from langchain.callbacks.streaming_aiter import AsyncIteratorCallbackHandler
 from langchain.callbacks.manager import AsyncCallbackManager
 
-
 import os
+from typing import List
 
 from graphrag_agent.config.settings import (
     TIKTOKEN_CACHE_DIR,
     OPENAI_EMBEDDING_CONFIG,
     OPENAI_LLM_CONFIG,
+    CACHE_EMBEDDING_PROVIDER,
+    CACHE_SENTENCE_TRANSFORMER_MODEL,
+    MODEL_CACHE_DIR,
+    EMBEDDING_BATCH_SIZE,
 )
+
+try:
+    # optional local dependencies
+    from sentence_transformers import SentenceTransformer
+    import torch
+except Exception:
+    SentenceTransformer = None
+    torch = None
 
 
 # 设置 tiktoken 缓存目录，避免每次联网拉取
@@ -22,6 +34,67 @@ def setup_cache():
 setup_cache()
 
 def get_embeddings_model():
+    """
+    返回一个 embeddings 接口对象。
+
+    如果环境变量或设置指向本地 sentence-transformers（`CACHE_EMBEDDING_PROVIDER='sentence_transformer'`），
+    则返回一个轻量适配器，暴露 `embed_documents(texts)` 与 `embed_query(text)` 方法以兼容项目调用。
+    否则回退到 OpenAIEmbeddings。
+    """
+    provider = (CACHE_EMBEDDING_PROVIDER or "").lower()
+
+    if provider == "sentence_transformer" and SentenceTransformer is not None:
+        class SentenceTransformerAdapter:
+            def __init__(self, model_name: str = CACHE_SENTENCE_TRANSFORMER_MODEL):
+                self.model_name = model_name
+                # 选择设备：优先 GPU
+                self.device = "cuda" if (torch is not None and torch.cuda.is_available()) else "cpu"
+                # 将模型缓存到项目 model cache 目录，避免每次下载
+                cache_folder = os.getenv("SENTENCE_TRANSFORMERS_CACHE") or str(MODEL_CACHE_DIR)
+                try:
+                    self.model = SentenceTransformer(self.model_name, cache_folder=cache_folder)
+                except TypeError:
+                    # older sentence-transformers may not support cache_folder kw
+                    self.model = SentenceTransformer(self.model_name)
+                try:
+                    # 尝试把模型移动到 device（若支持）
+                    if hasattr(self.model, 'to') and self.device == 'cuda':
+                        self.model.to(self.device)
+                except Exception:
+                    pass
+
+                # 获取 embedding 维度
+                try:
+                    self.embedding_size = int(self.model.get_sentence_embedding_dimension())
+                except Exception:
+                    self.embedding_size = None
+
+            def embed_documents(self, texts: List[str]):
+                # batch encode -> 返回 List[List[float]]
+                batch_size = EMBEDDING_BATCH_SIZE or 32
+                try:
+                    arr = self.model.encode(
+                        texts,
+                        batch_size=batch_size,
+                        show_progress_bar=False,
+                        convert_to_numpy=True,
+                        device=self.device,
+                    )
+                except TypeError:
+                    # older versions may not accept device in encode
+                    arr = self.model.encode(texts, batch_size=batch_size, show_progress_bar=False, convert_to_numpy=True)
+                return arr.tolist()
+
+            def embed_query(self, text: str):
+                try:
+                    arr = self.model.encode(text, show_progress_bar=False, convert_to_numpy=True, device=self.device)
+                except TypeError:
+                    arr = self.model.encode(text, show_progress_bar=False, convert_to_numpy=True)
+                return arr.tolist()
+
+        return SentenceTransformerAdapter()
+
+    # 默认回退到 OpenAIEmbeddings
     config = {k: v for k, v in OPENAI_EMBEDDING_CONFIG.items() if v}
     return OpenAIEmbeddings(**config)
 
