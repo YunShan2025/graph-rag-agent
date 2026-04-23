@@ -106,7 +106,19 @@ class SentenceTransformerEmbedding(EmbeddingProvider):
         cache_path.mkdir(parents=True, exist_ok=True)
 
         # 加载模型，指定缓存目录
-        self.model = SentenceTransformer(model_name, cache_folder=str(cache_path))
+        # 尝试使用 GPU（如果可用）以利用 RTX3050 加速
+        try:
+            import torch
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        except Exception:
+            device = 'cpu'
+
+        try:
+            # SentenceTransformer 支持传入 device 参数
+            self.model = SentenceTransformer(model_name, cache_folder=str(cache_path), device=device)
+        except TypeError:
+            # 兼容老版本 API：不带 device 参数
+            self.model = SentenceTransformer(model_name, cache_folder=str(cache_path))
         self._dimension = None
         self._initialized = True
 

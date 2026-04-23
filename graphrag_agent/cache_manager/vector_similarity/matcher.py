@@ -162,9 +162,12 @@ class VectorSimilarityMatcher:
         
         with self._lock:
             try:
+                # 保证映射一致：如果 index_to_key 为空但 key_to_index 有值，则从 key_to_index 反推
+                index_to_key_to_save = self.index_to_key or ({v: k for k, v in self.key_to_index.items()} if self.key_to_index else {})
+
                 data = {
                     'key_to_index': self.key_to_index,
-                    'index_to_key': self.index_to_key,
+                    'index_to_key': index_to_key_to_save,
                     'key_to_context': self.key_to_context,
                     'key_to_query': self.key_to_query,
                     'next_index': self._next_index
@@ -195,7 +198,40 @@ class VectorSimilarityMatcher:
             # 加载FAISS索引
             faiss_file = f"{self.index_file}.faiss"
             if os.path.exists(faiss_file):
-                self.index = faiss.read_index(faiss_file)
+                try:
+                    self.index = faiss.read_index(faiss_file)
+
+                    # 如果映射缺失但有 key_to_index，可以从它反推
+                    if (not self.index_to_key or len(self.index_to_key) != self.index.ntotal) and self.key_to_index:
+                        self.index_to_key = {int(v): k for k, v in self.key_to_index.items()}
+
+                    # 最后兜底：如果映射仍和索引数不匹配，但有 key_to_query，则尝试重建索引和映射
+                    if len(self.index_to_key) != self.index.ntotal and self.key_to_query:
+                        try:
+                            new_index = faiss.IndexFlatIP(self.dimension)
+                            new_index_to_key = {}
+                            # 按 key_to_index 中记录的顺序重建
+                            items = sorted(self.key_to_index.items(), key=lambda x: int(x[1]))
+                            for key, _idx in items:
+                                q = self.key_to_query.get(key)
+                                if not q:
+                                    continue
+                                emb = self.embedding_provider.encode(q)
+                                if emb.ndim == 1:
+                                    emb = emb.reshape(1, -1)
+                                new_index.add(emb)
+                                new_index_to_key[new_index.ntotal - 1] = key
+
+                            # 替换索引与映射
+                            self.index = new_index
+                            self.index_to_key = new_index_to_key
+                            self.key_to_index = {k: v for v, k in ((idx, key) for idx, key in new_index_to_key.items())}
+                            self._next_index = self.index.ntotal
+                        except Exception as e:
+                            print(f"重建内存索引映射失败: {e}")
+                except Exception as e:
+                    print(f"加载FAISS索引失败: {e}")
+                    self.index = faiss.IndexFlatIP(self.dimension)
             else:
                 # 如果FAISS文件不存在，重建索引
                 self._rebuild_index()
