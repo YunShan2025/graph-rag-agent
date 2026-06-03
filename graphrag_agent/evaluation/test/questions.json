@@ -1,14 +1,17 @@
 [
-    {
-        "question_id": 1,
-        "question": "优秀学生申请的条件?"
-    },
-    {
-        "question_id": 2,
-        "question": "获得优秀学生称号的奖励是什么?"
-    },
-    {
-        "question_id": 3,
-        "question": "国家奖学金和国家励志奖学金互斥吗?"
-    }
+    {"question_id": 1, "question": "国家奖学金的金额是多少？"},
+    {"question_id": 2, "question": "申请国家励志奖学金需要满足什么经济条件？"},
+    {"question_id": 3, "question": "学年奖学金分为几个等级？获奖比例分别是多少？"},
+    {"question_id": 4, "question": "勤工助学的最低时薪是多少？学期内每周最多工作多少小时？"},
+    {"question_id": 5, "question": "请假3-7天需要谁批准？请假超过7天呢？"},
+    {"question_id": 6, "question": "毕业论文的查重率要求是多少？答辩未通过怎么办？"},
+    {"question_id": 7, "question": "国家奖学金和国家励志奖学金能否同时获得？"},
+    {"question_id": 8, "question": "国家助学金能否与国家奖学金同时获得？"},
+    {"question_id": 9, "question": "推免生的GPA排名要求和英语要求分别是什么？"},
+    {"question_id": 10, "question": "如果学业成绩排名在10%-30%之间，是否可以申请国家奖学金？"},
+    {"question_id": 11, "question": "补考的最高分数是多少？补考仍未通过怎么办？"},
+    {"question_id": 12, "question": "三好学生的评选比例和学业成绩要求分别是什么？"},
+    {"question_id": 13, "question": "中南大学有哪些奖学金可以申请？它们的金额和条件有什么区别？"},
+    {"question_id": 14, "question": "学校对家庭经济困难学生有哪些资助政策？"},
+    {"question_id": 15, "question": "推免保研需要满足哪些条件？有哪些类型？"}
 ]

@@ -1,7 +1,7 @@
 import codecs
 import os
 from typing import List, Tuple, Dict, Optional
-import PyPDF2
+import fitz  # PyMuPDF
 from docx import Document
 import csv
 import json
@@ -188,19 +188,19 @@ class FileReader:
                 return f"[无法读取文件内容: {str(e)}]"
             
     def _read_pdf(self, file_path: str) -> str:
-        """读取PDF文件"""
+        """读取PDF文件（使用PyMuPDF，中文支持更好）"""
         try:
             text = ""
-            with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                for page_num in range(len(pdf_reader.pages)):
-                    try:
-                        page = pdf_reader.pages[page_num]
-                        page_text = page.extract_text() or ""
-                        text += page_text + "\n\n"
-                    except Exception as e:
-                        print(f"读取PDF文件 {os.path.basename(file_path)} 的第 {page_num+1} 页失败: {str(e)}")
-                        text += f"[第 {page_num+1} 页无法读取]\n\n"
+            doc = fitz.open(file_path)
+            for page_num in range(len(doc)):
+                try:
+                    page = doc[page_num]
+                    page_text = page.get_text("text")
+                    text += page_text + "\n\n"
+                except Exception as e:
+                    print(f"读取PDF文件 {os.path.basename(file_path)} 的第 {page_num+1} 页失败: {str(e)}")
+                    text += f"[第 {page_num+1} 页无法读取]\n\n"
+            doc.close()
             return text
         except Exception as e:
             print(f"读取PDF文件 {os.path.basename(file_path)} 失败: {str(e)}")
