@@ -119,6 +119,18 @@ class SentenceTransformerEmbedding(EmbeddingProvider):
         except TypeError:
             # 兼容老版本 API：不带 device 参数
             self.model = SentenceTransformer(model_name, cache_folder=str(cache_path))
+        except Exception:
+            # 网络不可用时回退到本地 snapshots 目录
+            model_key = model_name.replace("/", "--")
+            snapshots_dir = cache_path / f"models--sentence-transformers--{model_key}" / "snapshots"
+            snapshot_paths = []
+            if snapshots_dir.exists():
+                snapshot_paths = [p for p in snapshots_dir.iterdir() if p.is_dir()]
+            if snapshot_paths:
+                local_snapshot = sorted(snapshot_paths)[-1]
+                self.model = SentenceTransformer(str(local_snapshot), cache_folder=str(cache_path))
+            else:
+                raise
         self._dimension = None
         self._initialized = True
 

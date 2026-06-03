@@ -1,0 +1,3 @@
+[server]
+# Work around Streamlit watcher conflicts with torch.classes on Windows.
+fileWatcherType = "none"

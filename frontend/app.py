@@ -1,3 +1,9 @@
+import os
+# 临时绕过 OpenMP 重复初始化（不推荐作为长期解决方案）
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+# 避免 Streamlit 文件监视器扫描 torch.classes 时报错
+os.environ.setdefault("STREAMLIT_SERVER_FILE_WATCHER_TYPE", "none")
+
 import streamlit as st
 
 from utils.state import init_session_state

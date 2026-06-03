@@ -34,7 +34,12 @@ SERVER_RELOAD = _get_env_bool("SERVER_RELOAD", False)  # 热重载开关
 SERVER_LOG_LEVEL = os.getenv("SERVER_LOG_LEVEL", "info")  # 日志等级
 
 # Worker 数量优先使用 SERVER_WORKERS，否则回落到核心配置
-SERVER_WORKERS = _get_env_int("SERVER_WORKERS", core_workers) or core_workers
+_default_server_workers = 1 if os.name == "nt" else core_workers
+SERVER_WORKERS = _get_env_int("SERVER_WORKERS", _default_server_workers) or _default_server_workers
+
+# Windows 下多 worker 容易触发 socket listen 参数异常（WinError 10022），默认回退为单进程
+if os.name == "nt" and SERVER_WORKERS > 1:
+    SERVER_WORKERS = 1
 
 # 统一封装 uvicorn.run 可用参数
 UVICORN_CONFIG = {

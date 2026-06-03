@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
+from functools import wraps
 from collections import defaultdict
 import threading
 
@@ -132,6 +133,10 @@ def get_performance_collector():
 def monitor_performance(endpoint=None):
     """监控函数性能的装饰器"""
     def decorator(func):
+        if getattr(func, "_perf_wrapped", False):
+            return func
+
+        @wraps(func)
         def wrapper(*args, **kwargs):
             start_time = time.time()
             result = func(*args, **kwargs)
@@ -157,6 +162,7 @@ def monitor_performance(endpoint=None):
                 })
             
             return result
+        wrapper._perf_wrapped = True
         return wrapper
     return decorator
 
@@ -301,7 +307,15 @@ def display_enhanced_performance_stats():
 def decorate_api_functions():
     """为API函数添加性能监控装饰器"""
     try:
-        from frontend.utils.api import send_message, send_feedback, get_knowledge_graph, get_source_content
+        try:
+            import utils.api as api_module
+        except Exception:
+            import frontend.utils.api as api_module
+
+        send_message = api_module.send_message
+        send_feedback = api_module.send_feedback
+        get_knowledge_graph = api_module.get_knowledge_graph
+        get_source_content = api_module.get_source_content
         
         # 装饰原始函数
         original_send_message = send_message
@@ -327,11 +341,10 @@ def decorate_api_functions():
             return original_get_source_content(*args, **kwargs)
         
         # 替换原始函数
-        import frontend.utils.api
-        frontend.utils.api.send_message = monitored_send_message
-        frontend.utils.api.send_feedback = monitored_send_feedback
-        frontend.utils.api.get_knowledge_graph = monitored_get_knowledge_graph
-        frontend.utils.api.get_source_content = monitored_get_source_content
+        api_module.send_message = monitored_send_message
+        api_module.send_feedback = monitored_send_feedback
+        api_module.get_knowledge_graph = monitored_get_knowledge_graph
+        api_module.get_source_content = monitored_get_source_content
         
         return True
     except Exception as e:

@@ -1,5 +1,12 @@
+import os
+
+# Allow duplicate OpenMP runtime to avoid libiomp5md.dll initialization error
+# (If you prefer a stricter fix, remove duplicate OpenMP runtimes from dependencies.)
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from routers import api_router
 from server_config.database import get_db_manager
 from server_config.settings import UVICORN_CONFIG
@@ -10,6 +17,12 @@ app = FastAPI(title="知识图谱问答系统", description="基于知识图谱�
 
 # 添加路由
 app.include_router(api_router)
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    """根路径，重定向到交互文档"""
+    return RedirectResponse(url="/docs")
 
 # 获取数据库连接
 db_manager = get_db_manager()
