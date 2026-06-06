@@ -91,48 +91,39 @@ class LocalSearch:
             str: Cypher查询语句，用于检索相关内容
         """
         return """
-        WITH collect(node) as nodes
+        WITH collect(node) AS nodes
         WITH
         collect {
-            UNWIND nodes as n
-            MATCH (n)<-[:MENTIONS]-(c:__Chunk__)
-            WITH distinct c, count(distinct n) as freq
-            RETURN {id:c.id, text: c.text} AS chunkText
-            ORDER BY freq DESC
-            LIMIT $topChunks
+            UNWIND nodes AS n
+            RETURN n.text AS chunkText
         } AS text_mapping,
         collect {
-            UNWIND nodes as n
-            MATCH (n)-[:IN_COMMUNITY]->(c:__Community__)
-            WITH distinct c, c.community_rank as rank, c.weight AS weight
-            RETURN c.summary 
+            UNWIND nodes AS n
+            MATCH (n)-[:MENTIONS]->(e:__Entity__)
+            MATCH (e)-[:IN_COMMUNITY]->(c:__Community__)
+            WITH DISTINCT c, c.community_rank AS rank, c.weight AS weight
+            RETURN c.summary
             ORDER BY rank, weight DESC
             LIMIT $topCommunities
         } AS report_mapping,
         collect {
-            UNWIND nodes as n
-            MATCH (n)-[r]-(m:__Entity__) 
-            WHERE NOT m IN nodes
-            RETURN r.description AS descriptionText
-            ORDER BY r.weight DESC 
+            UNWIND nodes AS n
+            MATCH (n)-[:MENTIONS]->(e:__Entity__)
+            MATCH (e)-[r]-(m:__Entity__)
+            WITH DISTINCT r.description AS descriptionText, r.weight AS weight
+            RETURN descriptionText
+            ORDER BY weight DESC
             LIMIT $topOutsideRels
-        } as outsideRels,
+        } AS outsideRels,
         collect {
-            UNWIND nodes as n
-            MATCH (n)-[r]-(m:__Entity__) 
-            WHERE m IN nodes
-            RETURN r.description AS descriptionText
-            ORDER BY r.weight DESC 
-            LIMIT $topInsideRels
-        } as insideRels,
-        collect {
-            UNWIND nodes as n
-            RETURN n.description AS descriptionText
-        } as entities
+            UNWIND nodes AS n
+            MATCH (n)-[:MENTIONS]->(e:__Entity__)
+            RETURN DISTINCT e.description AS descriptionText
+        } AS entities
         RETURN {
-            Chunks: text_mapping, 
-            Reports: report_mapping, 
-            Relationships: outsideRels + insideRels, 
+            Chunks: text_mapping,
+            Reports: report_mapping,
+            Relationships: outsideRels,
             Entities: entities
         } AS text, 1.0 AS score, {} AS metadata
         """

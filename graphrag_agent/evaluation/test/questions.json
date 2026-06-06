@@ -13,5 +13,7 @@
     {"question_id": 12, "question": "三好学生的评选比例和学业成绩要求分别是什么？"},
     {"question_id": 13, "question": "中南大学有哪些奖学金可以申请？它们的金额和条件有什么区别？"},
     {"question_id": 14, "question": "学校对家庭经济困难学生有哪些资助政策？"},
-    {"question_id": 15, "question": "推免保研需要满足哪些条件？有哪些类型？"}
+    {"question_id": 15, "question": "推免保研需要满足哪些条件？有哪些类型？"},
+    {"question_id": 16, "question": "国家励志奖学金的金额是多少？"},
+    {"question_id": 17, "question": "分析中南大学奖学金体系的整体架构，包括各类奖学金的设置目的、覆盖范围和相互关系。"}
 ]

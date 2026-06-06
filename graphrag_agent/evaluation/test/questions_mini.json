@@ -1,0 +1,5 @@
+[
+    {"question_id": 1, "question": "国家奖学金的金额是多少？", "difficulty": "简单"},
+    {"question_id": 2, "question": "国家奖学金和国家励志奖学金能否同时获得？", "difficulty": "中等"},
+    {"question_id": 3, "question": "学业成绩排名在10%-30%之间的学生是否可以申请国家奖学金？需要满足什么条件？", "difficulty": "困难"}
+]

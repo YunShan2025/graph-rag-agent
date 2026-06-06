@@ -12,7 +12,8 @@ from graphrag_agent.models.get_models import get_llm_model, get_embeddings_model
 from graphrag_agent.graph.core import connection_manager
 from graphrag_agent.config.prompts import (
     system_template_build_graph,
-    human_template_build_graph
+    human_template_build_graph,
+    DEEP_RESEARCH_SYNTHESIS_PROMPT,
 )
 from graphrag_agent.config.settings import (
     entity_types,
@@ -840,80 +841,64 @@ class DeeperResearchTool:
         if final_answer_key in self._final_answer_cache:
             final_answer = self._final_answer_cache[final_answer_key]
         else:
-            # 增强答案生成过程，整合知识图谱和社区分析结果
+            # ===== 方案3：先整合原始信息，再生成最终答案 =====
+
+            # 准备知识图谱实体信息
+            central_entities = self.knowledge_builder.get_central_entities(limit=5)
+            entities_info = "无"
+            if central_entities:
+                entities_info = "\n".join([
+                    f"- {e.get('id', '')}: {e.get('properties', {}).get('description', '无描述')}"
+                    for e in central_entities
+                ])
+
+            # 准备社区信息
+            community_info = "无"
+            if community_summaries:
+                community_info = "\n".join([f"- {s[:200]}" for s in community_summaries[:2]])
+
+            # 准备矛盾信息
+            contradiction_info = "无"
+            if contradiction_result["contradictions"]:
+                contradiction_lines = []
+                for c in contradiction_result["contradictions"][:3]:
+                    if c["type"] == "numerical":
+                        v1 = c.get("value1", "?")
+                        v2 = c.get("value2", "?")
+                        contradiction_lines.append(f"- 数值不一致: {v1} vs {v2}")
+                    else:
+                        contradiction_lines.append(f"- {c.get('analysis', '')}")
+                contradiction_info = "\n".join(contradiction_lines)
+
+            # 第一步：用LLM整合原始信息为关键发现
+            synthesis_prompt = DEEP_RESEARCH_SYNTHESIS_PROMPT.format(
+                query=query,
+                retrieved_content=retrieved_content[:4096],  # 限制长度避免超token
+                entities_info=entities_info,
+                community_info=community_info,
+                contradiction_info=contradiction_info,
+            )
+
+            try:
+                self._log("\n[深度研究] 整合多源信息为关键发现")
+                synthesis_response = self.llm.invoke(synthesis_prompt)
+                synthesized_findings = synthesis_response.content if hasattr(synthesis_response, 'content') else str(synthesis_response)
+            except Exception as e:
+                self._log(f"\n[深度研究] 信息整合失败，使用原始信息: {e}")
+                synthesized_findings = retrieved_content[:2048]
+
+            # 第二步：基于整合后的关键发现生成最终答案
             enhanced_prompt = f"""
             用户问题：{query}
-            
-            我已经通过多种检索方法收集了以下信息：
-            
-            {retrieved_content}
-            
-            此外，我通过知识图谱分析发现了以下关键实体和关系：
-            """
-            
-            # 添加知识图谱分析结果
-            central_entities = self.knowledge_builder.get_central_entities(limit=5)
-            if central_entities:
-                enhanced_prompt += "\n核心实体及其重要性：\n"
-                for entity in central_entities:
-                    entity_id = entity.get("id", "")
-                    importance = entity.get("centrality", entity.get("degree", 0))
-                    entity_type = entity.get("type", "unknown")
-                    properties = entity.get("properties", {})
-                    description = properties.get("description", "无描述")
-                    
-                    enhanced_prompt += f"- {entity_id} (重要性: {importance:.3f}, 类型: {entity_type}): {description}\n"
-            
-            # 添加社区分析结果
-            if community_summaries:
-                enhanced_prompt += "\n来自相关知识社区的见解：\n"
-                for i, summary in enumerate(community_summaries[:2]):
-                    enhanced_prompt += f"- 社区{i+1}: {summary[:200]}...\n"
-            
-            # 添加探索路径分析
-            if exploration_path:
-                enhanced_prompt += "\n知识探索路径分析：\n"
-                path_summary = []
-                current_entity = None
-                for step in exploration_path:
-                    if step["step"] > 0:  # 跳过起始实体
-                        if current_entity != step["node_id"]:
-                            current_entity = step["node_id"]
-                            path_summary.append(f"实体 {current_entity}: {step['reasoning']}")
-                
-                enhanced_prompt += "\n".join(path_summary[:3]) + "\n"
-            
-            # 添加初始子查询分析结果
-            if initial_sub_queries:
-                enhanced_prompt += "\n问题分解与深入分析：\n"
-                for i, subq in enumerate(initial_sub_queries, 1):
-                    related_info = []
-                    for info in self.deep_research.all_retrieved_info:
-                        if any(term.lower() in info.lower() for term in subq.lower().split()):
-                            related_info.append(info[:100] + "..." if len(info) > 100 else info)
-                    
-                    if related_info:
-                        enhanced_prompt += f"- 子问题{i}: {subq} - 找到{len(related_info)}条相关信息\n"
-                    else:
-                        enhanced_prompt += f"- 子问题{i}: {subq} - 未找到直接相关信息\n"
-            
-            # 添加矛盾分析结果  
-            if contradiction_result["contradictions"]:
-                enhanced_prompt += "\n信息矛盾分析：\n"
-                for i, contradiction in enumerate(contradiction_result["contradictions"][:3]):
-                    if contradiction["type"] == "numerical":
-                        enhanced_prompt += f"- 矛盾{i+1}: 在数值上存在不一致，一处显示 {contradiction.get('value1')}，另一处显示 {contradiction.get('value2')}\n"
-                    else:
-                        enhanced_prompt += f"- 矛盾{i+1}: {contradiction.get('analysis', '')}\n"
-            
-            # 请求生成最终答案
-            enhanced_prompt += """
-            请基于以上所有信息，生成一个全面深入的回答。回答应该:
+
+            以下是经过整理的关键发现：
+
+            {synthesized_findings}
+
+            请基于以上关键发现，生成一个全面深入的回答。回答应该:
             1. 直接回答用户问题
             2. 结构清晰，逻辑性强
-            3. 整合所有相关信息，包括知识图谱和社区分析的见解
-            4. 如有必要，指出信息中的不确定性或矛盾
-            5. 对问题的不同方面进行全面分析
+            3. 如有不确定之处，请如实说明
             """
             
             try:

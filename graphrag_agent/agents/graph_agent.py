@@ -176,18 +176,18 @@ class GraphAgent(BaseAgent):
 
         # 首先尝试全局缓存
         global_result = self.global_cache_manager.get(question)
-        if global_result:
-            self._log_execution("generate", 
-                            {"question": question, "docs_length": len(docs)}, 
+        if global_result and isinstance(global_result, str):
+            self._log_execution("generate",
+                            {"question": question, "docs_length": len(docs)},
                             "全局缓存命中")
             return {"messages": [AIMessage(content=global_result)]}
 
         # 然后检查会话缓存
         thread_id = state.get("configurable", {}).get("thread_id", "default")
         cached_result = self.cache_manager.get(question, thread_id=thread_id)
-        if cached_result:
-            self._log_execution("generate", 
-                            {"question": question, "docs_length": len(docs)}, 
+        if cached_result and isinstance(cached_result, str):
+            self._log_execution("generate",
+                            {"question": question, "docs_length": len(docs)},
                             "会话缓存命中")
             # 将命中内容同步到全局缓存
             self.global_cache_manager.set(question, cached_result)
@@ -226,7 +226,7 @@ class GraphAgent(BaseAgent):
 
         # 检查缓存
         cached_result = self.cache_manager.get(f"reduce:{question}")
-        if cached_result:
+        if cached_result and isinstance(cached_result, str):
             self._log_execution("reduce", 
                                {"question": question, "docs_length": len(docs)}, 
                                cached_result)
@@ -270,7 +270,7 @@ class GraphAgent(BaseAgent):
         
         # 检查缓存
         cached_result = self.cache_manager.get(f"generate:{question}", thread_id=thread_id)
-        if cached_result:
+        if cached_result and isinstance(cached_result, str):
             # 分块输出缓存内容
             sentences = re.split(r'([.!?。！？]\s*)', cached_result)
             buffer = ""

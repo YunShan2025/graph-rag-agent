@@ -326,27 +326,37 @@ class HybridSearchTool(BaseSearchTool):
         }) AS relationships
         """
         
-        # 获取文本块信息
+        # 获取文本块信息 — 不限数量，Python 端按关键词相关度排序后取 top-K
         chunk_query = """
         // 查找包含这些实体的文本块
         MATCH (c:__Chunk__)-[:MENTIONS]->(e:__Entity__)
         WHERE e.id IN $entity_ids
-        
-        RETURN collect(DISTINCT {
-            id: c.id, 
-            text: c.text
-        })[0..5] AS chunks
+
+        RETURN DISTINCT c.id AS id, c.text AS text
         """
-        
+
         try:
             # 获取实体信息
             entity_results = self.db_query(entity_query, {"entity_ids": entity_ids})
-            
+
             # 获取关系信息
             relation_results = self.db_query(relation_query, {"entity_ids": entity_ids})
-            
+
             # 获取文本块信息
             chunk_results = self.db_query(chunk_query, {"entity_ids": entity_ids})
+
+            # 按关键词相关度排序 chunk：包含查询关键词越多的 chunk 排越前
+            if not chunk_results.empty and keywords:
+                def _chunk_relevance(row):
+                    text = row.get("text", "") or ""
+                    score = sum(1 for kw in keywords if kw in text)
+                    return -score  # 负数让 sort_values(ascending=True) 实现降序
+
+                chunk_results["_relevance"] = chunk_results.apply(_chunk_relevance, axis=1)
+                chunk_results = chunk_results.sort_values("_relevance", ascending=True).drop(columns=["_relevance"])
+
+            # 限制返回数量
+            chunk_results = chunk_results.head(10)
             
             self.performance_metrics["query_time"] += time.time() - query_start
             
@@ -405,28 +415,26 @@ class HybridSearchTool(BaseSearchTool):
                         )
                     )
             
-            # 添加文本块信息
-            if not chunk_results.empty and 'chunks' in chunk_results.columns:
-                chunks = chunk_results.iloc[0]['chunks']
-                if chunks:
-                    low_level.append("\n### 相关文本")
-                    for chunk in chunks:
-                        chunk_text = f"- ID: {chunk['id']}\n  内容: {chunk['text']}"
-                        low_level.append(chunk_text)
-                        retrieval_results.append(
-                            create_retrieval_result(
-                                evidence=chunk.get("text", ""),
-                                source="hybrid_search",
-                                granularity="Chunk",
-                                metadata=create_retrieval_metadata(
-                                    source_id=str(chunk.get("id")),
-                                    source_type="chunk",
-                                    confidence=0.7,
-                                    extra={"raw_chunk": chunk},
-                                ),
-                                score=0.7,
-                            )
+            # 添加文本块信息（查询返回逐行结果，每行有 id 和 text）
+            if not chunk_results.empty and 'text' in chunk_results.columns:
+                low_level.append("\n### 相关文本")
+                for _, row in chunk_results.iterrows():
+                    chunk_text = f"- ID: {row['id']}\n  内容: {row['text']}"
+                    low_level.append(chunk_text)
+                    retrieval_results.append(
+                        create_retrieval_result(
+                            evidence=row.get("text", ""),
+                            source="hybrid_search",
+                            granularity="Chunk",
+                            metadata=create_retrieval_metadata(
+                                source_id=str(row.get("id")),
+                                source_type="chunk",
+                                confidence=0.7,
+                                extra={"raw_chunk": row.to_dict()},
+                            ),
+                            score=0.7,
                         )
+                    )
             
             if not low_level:
                 return "没有找到相关的低级内容。", retrieval_results

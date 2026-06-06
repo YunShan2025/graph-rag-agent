@@ -1,0 +1,22 @@
+[
+    {"question_id": 1, "question": "国家奖学金的金额是多少？", "difficulty": "简单", "source": "中南大学本科生国家奖学金评审办法.pdf 第三条"},
+    {"question_id": 2, "question": "国家励志奖学金的金额是多少？", "difficulty": "简单", "source": "中南大学本科生国家励志奖学金评审办法.pdf 第三条"},
+    {"question_id": 3, "question": "勤工助学本科生的最低时薪是多少？", "difficulty": "简单", "source": "中南大学勤工助学管理办法.pdf 第十四条"},
+    {"question_id": 4, "question": "学生参加勤工助学每周最多工作多少小时？", "difficulty": "简单", "source": "中南大学勤工助学管理办法.pdf 第十二条"},
+    {"question_id": 5, "question": "国家助学金分为几个等级？", "difficulty": "简单", "source": "中南大学本科生国家助学金评审办法.pdf 第三条"},
+    {"question_id": 6, "question": "学年奖学金的特等奖金额是多少？", "difficulty": "简单", "source": "中南大学本科生学年奖学金评定办法.pdf 表格"},
+    {"question_id": 7, "question": "申请国家励志奖学金需要满足什么经济条件？", "difficulty": "中等", "source": "中南大学本科生国家励志奖学金评审办法.pdf 第四条"},
+    {"question_id": 8, "question": "国家奖学金和国家励志奖学金能否同时获得？", "difficulty": "中等", "source": "中南大学本科生国家奖学金评审办法.pdf 第七条"},
+    {"question_id": 9, "question": "国家助学金能否与国家奖学金同时获得？", "difficulty": "中等", "source": "中南大学本科生国家助学金评审办法.pdf 第六条"},
+    {"question_id": 10, "question": "补考成绩在排名计算中如何处理？", "difficulty": "中等", "source": "中南大学本科生学籍管理规定.pdf 第二十条"},
+    {"question_id": 11, "question": "推免生的学业成绩排名要求是多少？", "difficulty": "中等", "source": "中南大学推荐优秀应届本科毕业生免试攻读硕士学位研究生资格的管理办法.pdf 第七条"},
+    {"question_id": 12, "question": "优秀学生的评选比例是多少？", "difficulty": "中等", "source": "中南大学学生评优实施办法.pdf 第八条"},
+    {"question_id": 13, "question": "事假3-7天需要谁批准？", "difficulty": "中等", "source": "中南大学学生请假规定.pdf 第六条"},
+    {"question_id": 14, "question": "学年奖学金一等奖在普通班和教改班的比例分别是多少？", "difficulty": "中等", "source": "中南大学本科生学年奖学金评定办法.pdf 表格"},
+    {"question_id": 15, "question": "国家助学金三个等级的金额分别是多少？", "difficulty": "中等", "source": "中南大学本科生国家助学金评审办法.pdf 第三条"},
+    {"question_id": 16, "question": "学业成绩排名在10%-30%之间的学生是否可以申请国家奖学金？需要满足什么条件？", "difficulty": "困难", "source": "中南大学本科生国家奖学金评审办法.pdf 第五条"},
+    {"question_id": 17, "question": "推免生的外语能力要求是什么？", "difficulty": "困难", "source": "中南大学推荐优秀应届本科毕业生免试攻读硕士学位研究生资格的管理办法.pdf 第七条"},
+    {"question_id": 18, "question": "补考仍未通过的学生应该怎么办？", "difficulty": "困难", "source": "中南大学本科生学籍管理规定.pdf 第二十一条"},
+    {"question_id": 19, "question": "同时获得国家奖学金和国家助学金的学生需要满足什么条件？", "difficulty": "困难", "source": "中南大学本科生国家奖学金评审办法.pdf 第七条 + 中南大学本科生国家助学金评审办法.pdf 第六条"},
+    {"question_id": 20, "question": "教改班学生与普通班学生在学年奖学金评定中有什么区别？", "difficulty": "困难", "source": "中南大学本科生学年奖学金评定办法.pdf 表格"}
+]

@@ -1,6 +1,6 @@
 from typing import Annotated, Sequence, TypedDict, List, Dict, Any, AsyncGenerator, Optional
 from abc import ABC, abstractmethod
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
@@ -42,6 +42,7 @@ class BaseAgent(ABC):
         self.execution_log = []
     
         # 常规上下文感知缓存（会话内）
+        # 禁用向量相似性匹配，避免关键词缓存条目被误匹配为回答缓存
         self.cache_manager = CacheManager(
             key_strategy=ContextAwareCacheKeyStrategy(),
             storage_backend=HybridCacheBackend(
@@ -50,9 +51,10 @@ class BaseAgent(ABC):
                 disk_max_size=2000
             ) if not memory_only else None,
             cache_dir=cache_dir,
-            memory_only=memory_only
+            memory_only=memory_only,
+            enable_vector_similarity=False
         )
-        
+
         # 全局缓存（跨会话）
         self.global_cache_manager = CacheManager(
             key_strategy=GlobalCacheKeyStrategy(),
@@ -62,7 +64,8 @@ class BaseAgent(ABC):
                 disk_max_size=5000
             ) if not memory_only else None,
             cache_dir=f"{cache_dir}/global",
-            memory_only=memory_only
+            memory_only=memory_only,
+            enable_vector_similarity=False
         )
         
         self.performance_metrics = {}  # 性能指标收集
@@ -191,16 +194,18 @@ class BaseAgent(ABC):
     
     def _agent_node(self, state):
         """Agent 节点逻辑"""
+        import json as _json
+
         messages = state["messages"]
-        
+
         # 提取关键词优化查询
         if len(messages) > 0 and isinstance(messages[-1], HumanMessage):
             query = messages[-1].content
             keywords = self._extract_keywords(query)
-            
+
             # 记录关键词
             self._log_execution("extract_keywords", query, keywords)
-            
+
             # 增强消息，添加关键词信息
             if keywords:
                 # 创建一个新的消息，带有关键词元数据
@@ -210,11 +215,45 @@ class BaseAgent(ABC):
                 )
                 # 替换原始消息
                 messages = messages[:-1] + [enhanced_message]
-        
+
         # 使用工具处理请求
         model = self.llm.bind_tools(self.tools)
-        response = model.invoke(messages)
-        
+        try:
+            response = model.invoke(messages)
+        except Exception as e:
+            # deepseek 等模型在 bind_tools 后可能返回 dict 导致 AIMessage 验证失败
+            # 回退到不带工具的 LLM 调用，强制选择第一个工具
+            print(f"[AgentNode] bind_tools 调用失败({type(e).__name__}: {str(e)[:80]})，回退到无工具模式")
+            response = self.llm.invoke(messages)
+            # 手动构造 tool_call 指向第一个工具
+            if self.tools:
+                first_tool = self.tools[0]
+                tool_name = getattr(first_tool, "name", None) or getattr(first_tool, "__name__", "search_tool")
+                tool_args = {"query": messages[-1].content if messages else ""}
+                response = AIMessage(
+                    content=response.content if hasattr(response, "content") and isinstance(response.content, str) else str(getattr(response, "content", "")),
+                    tool_calls=[{
+                        "id": "fallback_tool_call_0",
+                        "name": tool_name,
+                        "args": tool_args,
+                    }],
+                )
+
+        # 处理 deepseek 等模型可能返回 dict 而非 AIMessage 的情况
+        if isinstance(response, dict):
+            content = response.get("content", "")
+            if isinstance(content, dict):
+                content = _json.dumps(content, ensure_ascii=False)
+            elif not isinstance(content, str):
+                content = str(content)
+            response = AIMessage(
+                content=content,
+                additional_kwargs=response.get("additional_kwargs", {}),
+                tool_calls=response.get("tool_calls", []),
+            )
+        elif hasattr(response, "content") and isinstance(response.content, dict):
+            response.content = _json.dumps(response.content, ensure_ascii=False)
+
         self._log_execution("agent", messages, response)
         return {"messages": [response]}
     
@@ -295,7 +334,7 @@ class BaseAgent(ABC):
         
         # 1. 首先尝试全局缓存（跨会话缓存）
         global_result = self.global_cache_manager.get(query)
-        if global_result:
+        if global_result and isinstance(global_result, str):
             print(f"全局缓存命中: {query[:30]}...")
             
             cache_time = time.time() - cache_check_start
@@ -308,7 +347,7 @@ class BaseAgent(ABC):
         
         # 2. 尝试快速路径 - 跳过验证的高质量缓存
         fast_result = self.check_fast_cache(query, thread_id)
-        if fast_result:
+        if fast_result and isinstance(fast_result, str):
             print(f"快速路径缓存命中: {query[:30]}...")
             
             # 将命中的内容同步到全局缓存
@@ -324,7 +363,7 @@ class BaseAgent(ABC):
         
         # 3. 尝试常规缓存路径，但优化验证
         cached_response = self.cache_manager.get(query, skip_validation=True, thread_id=thread_id)
-        if cached_response:
+        if cached_response and isinstance(cached_response, str):
             print(f"常规缓存命中，跳过验证: {query[:30]}...")
             
             # 将命中的内容同步到全局缓存

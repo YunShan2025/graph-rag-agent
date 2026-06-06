@@ -31,6 +31,7 @@ from graphrag_agent.config.prompts.agent_prompts import (
     CONTRADICTION_IMPACT_PROMPT,
     HYBRID_AGENT_GENERATE_PROMPT,
     NAIVE_RAG_HUMAN_PROMPT,
+    DEEP_RESEARCH_SYNTHESIS_PROMPT,
 )
 from graphrag_agent.config.prompts.qa_prompts import (
     NAIVE_PROMPT,
@@ -111,6 +112,7 @@ __all__ = [
     "CONTRADICTION_IMPACT_PROMPT",
     "HYBRID_AGENT_GENERATE_PROMPT",
     "NAIVE_RAG_HUMAN_PROMPT",
+    "DEEP_RESEARCH_SYNTHESIS_PROMPT",
     # 问答阶段模板
     "NAIVE_PROMPT",
     "LC_SYSTEM_PROMPT",
